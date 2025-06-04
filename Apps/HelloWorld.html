@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Cesium Car</title>
+  <script src="../Build/CesiumUnminified/Cesium.js"></script>
+  <link href="../Build/CesiumUnminified/Widgets/widgets.css" rel="stylesheet" />
+  <style>
+    html, body, #cesiumContainer {
+      width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  <script>
+    Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkZmFkN2Q4Zi0zNTRlLTQ3MGQtYmEzZC0zMWNlN2NkMjAxMWIiLCJpZCI6MzA5MjM2LCJpYXQiOjE3NDkwNDkzNTl9.0CIJCm6wIopRc2OdnqfRuvAj_27UNwQCvry5j7pQz2s";
+
+    // Create the Cesium Viewer with terrain
+    const viewer = new Cesium.Viewer("cesiumContainer", {
+      terrain: Cesium.Terrain.fromWorldTerrain(),
+      shadows: true,
+      shouldAnimate: true
+    });
+
+    const initialPos = Cesium.Cartesian3.fromDegrees(-75.59777, 40.03883, 100)
+    // Set the camera view (longitude, latitude, height)
+    viewer.camera.setView({
+      destination: initialPos,
+      orientation: {
+        heading: 0,
+        pitch: -0.5,
+        roll: 0,
+      },
+    });
+
+    // Initial setup
+    let heading = 0;
+    let speed = 0;
+    let position = initialPos;
+
+    const carEntity = viewer.entities.add({
+      name: "Car",
+      position: new Cesium.CallbackProperty(() => position, false),
+      orientation: new Cesium.CallbackProperty(() => {
+        const hpr = Cesium.HeadingPitchRoll.fromDegrees(heading, 0, 0);
+        return Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
+      }, false),
+      model: {
+        uri: "../models/Car.glb",
+        scale: 0.025,
+        heightReference: Cesium.HeightReference.CLAMP_TO_TERRAIN
+      }
+    });
+    viewer.trackedEntity = carEntity;
+
+    // Key state
+    const keys = {};
+
+    document.addEventListener("keydown", (e) => keys[e.code] = true);
+    document.addEventListener("keyup", (e) => keys[e.code] = false);
+
+    // Movement loop
+    viewer.clock.onTick.addEventListener(() => {
+      const dt = 0.016;
+
+      if (keys["KeyA"]) heading -= 90 * dt;
+      if (keys["KeyD"]) heading += 90 * dt;
+      if (keys["KeyW"]) speed = 50;
+      else if (keys["KeyS"]) speed = -5;
+      else speed = 0;
+
+      // Get current local frame at car's position
+      const hpr = Cesium.HeadingPitchRoll.fromDegrees(heading, 0, 0);
+      const transform = Cesium.Transforms.headingPitchRollToFixedFrame(
+        position,
+        hpr
+      );
+
+      // Forward vector in local frame
+      const forwardLocal = new Cesium.Cartesian3(1, 0, 0); // Y axis = forward in ENU
+
+      // Rotate forward vector into global frame
+      const forwardWorld = Cesium.Matrix4.multiplyByPointAsVector(
+        transform,
+        forwardLocal,
+        new Cesium.Cartesian3()
+      );
+
+      // Normalize and scale by speed
+      Cesium.Cartesian3.normalize(forwardWorld, forwardWorld);
+      Cesium.Cartesian3.multiplyByScalar(forwardWorld, speed * dt, forwardWorld);
+
+      // Move the car
+      Cesium.Cartesian3.add(position, forwardWorld, position);
+
+    });
+
+  </script>
+</body>
+</html>
