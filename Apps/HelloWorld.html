@@ -86,7 +86,9 @@
       const steeringBackRate = 100;
       const wheelBase = 5.0; // distance between front and rear axle (affects turning radius)
       const acceleration = 50;
+      const accelerationback = 40;
       const friction = 10;
+      const brakes = 160;
 
       viewer.clock.onTick.addEventListener(() => {
         const dt = 0.016;
@@ -109,7 +111,7 @@
         if (keys["KeyW"]) {
           speed = speed + acceleration * dt;
         } else if (keys["KeyS"]) {
-          speed = -5;
+          speed = speed - accelerationback * dt;
         } 
 
         if (speed > 0) {
@@ -124,6 +126,17 @@
           const angularVelocity = speed / turnRadius; // radians per second
           heading += Cesium.Math.toDegrees(angularVelocity * dt * Math.sign(steeringAngle));
         }
+
+
+        if (keys["Space"]) {
+          if (speed > 0) {
+              speed = Math.max(speed - brakes * dt, 0);
+          } else if (speed < 0) {
+              speed = Math.min(speed + brakes * dt, 0);
+          }
+        }
+
+
 
         // Apply movement
         const hpr = Cesium.HeadingPitchRoll.fromDegrees(heading, 0, 0);
