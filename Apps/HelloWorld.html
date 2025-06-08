@@ -1,180 +1,234 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Cesium Car</title>
-  <script src="../Build/CesiumUnminified/Cesium.js"></script>
-  <link href="../Build/CesiumUnminified/Widgets/widgets.css" rel="stylesheet" />
-  <style>
-    html, body, #cesiumContainer {
-      width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
-    }
-  </style>
-</head>
-<body>
-  <div id="cesiumContainer"></div>
-  <script>
-    Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkZmFkN2Q4Zi0zNTRlLTQ3MGQtYmEzZC0zMWNlN2NkMjAxMWIiLCJpZCI6MzA5MjM2LCJpYXQiOjE3NDkwNDkzNTl9.0CIJCm6wIopRc2OdnqfRuvAj_27UNwQCvry5j7pQz2s";
-
-    async function initViewer() {
-      // Load terrain provider first
-      const terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
-        Cesium.IonResource.fromAssetId(1),
-        { requestVertexNormals: true }
-      );
-  
-      const viewer = new Cesium.Viewer("cesiumContainer", {
-        terrainProvider: terrainProvider,
-        shadows: true,
-        shouldAnimate: true,
-      });
-  
-      const initialPos = Cesium.Cartesian3.fromDegrees(-75.59777, 40.03883, 100);
-      viewer.camera.setView({
-        destination: initialPos,
-        orientation: {
-          heading: 0,
-          pitch: -0.5,
-          roll: 0,
-        },
-      });
-  
-      let heading = 0;
-      let speed = 0;
-      let position = initialPos;
-  
-      const keys = {};
-      document.addEventListener("keydown", (e) => keys[e.code] = true);
-      document.addEventListener("keyup", (e) => keys[e.code] = false);
-  
-      const carEntity = viewer.entities.add({
-        name: "Car",
-        position: new Cesium.CallbackProperty(() => position, false),
-        orientation: new Cesium.CallbackProperty(() => {
-          const hpr = Cesium.HeadingPitchRoll.fromDegrees(heading, 0, 0);
-          return Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
-        }, false),
-        model: {
-          uri: "../models/Car.glb",
-          scale: 0.025,
-          heightReference: Cesium.HeightReference.NONE,
-        },
-      });
-  
-      viewer.trackedEntity = carEntity;
-  
-      async function updateHeightAboveGround() {
-        const carto = Cesium.Cartographic.fromCartesian(position);
-        try {
-          const updated = await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [carto]);
-          const height = updated[0].height;
-          carto.height = height + 1.0;
-          position = Cesium.Cartographic.toCartesian(carto);
-        } catch (err) {
-          console.error("Height sampling error:", err);
-        }
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Cesium Car</title>
+    <script src="../Build/CesiumUnminified/Cesium.js"></script>
+    <link
+      href="../Build/CesiumUnminified/Widgets/widgets.css"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body,
+      #cesiumContainer {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
       }
-  
-      let lastSampleTime = 0;
-      const sampleInterval = 10;
-  
-      let steeringAngle = 0; // in degrees
-      const maxSteeringAngle = 30; // maximum left/right steering
-      const steeringRate = 120; // degrees per second
-      const steeringBackRate = 100;
-      const wheelBase = 5.0; // distance between front and rear axle (affects turning radius)
-      const acceleration = 5;
-      const accelerationback = 200;
-      const friction = 100;
-      const brakingFactor = 160;
+    </style>
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+    <script>
+      Cesium.Ion.defaultAccessToken =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkZmFkN2Q4Zi0zNTRlLTQ3MGQtYmEzZC0zMWNlN2NkMjAxMWIiLCJpZCI6MzA5MjM2LCJpYXQiOjE3NDkwNDkzNTl9.0CIJCm6wIopRc2OdnqfRuvAj_27UNwQCvry5j7pQz2s";
 
-      const maxForwardSpeed = 150;
-      const maxReverseSpeed = -20;
+      async function initViewer() {
+        // Load terrain provider first
+        const terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
+          Cesium.IonResource.fromAssetId(1),
+          { requestVertexNormals: true }
+        );
 
-      viewer.clock.onTick.addEventListener(() => {
-        const dt = 0.016;
+        const viewer = new Cesium.Viewer("cesiumContainer", {
+          terrainProvider: terrainProvider,
+          shadows: true,
+          shouldAnimate: true,
+        });
 
-        // Adjust steering angle
-        if (keys["KeyA"]) {
-          if(steeringAngle > -maxSteeringAngle )
-          steeringAngle = Math.min(steeringAngle - steeringRate * dt, maxSteeringAngle);
-        } else if (keys["KeyD"]) {
-          if(steeringAngle < maxSteeringAngle )
-          steeringAngle = Math.max(steeringAngle + steeringRate * dt, -maxSteeringAngle);
-        } else {
-          // Return steering to center gradually
-          if (steeringAngle > 0) {
-            steeringAngle = Math.max(steeringAngle - steeringBackRate * dt, 0);
-          } else if (steeringAngle < 0) {
-            steeringAngle = Math.min(steeringAngle + steeringBackRate * dt, 0);
+        const initialPos = Cesium.Cartesian3.fromDegrees(
+          -75.59777,
+          40.03883,
+          100
+        );
+        viewer.camera.setView({
+          destination: initialPos,
+          orientation: {
+            heading: 0,
+            pitch: -0.5,
+            roll: 0,
+          },
+        });
+
+        let heading = 0;
+        let speed = 0;
+        let position = initialPos;
+
+        const keys = {};
+        document.addEventListener("keydown", (e) => (keys[e.code] = true));
+        document.addEventListener("keyup", (e) => (keys[e.code] = false));
+
+        const carEntity = viewer.entities.add({
+          name: "Car",
+          position: new Cesium.CallbackProperty(() => position, false),
+          orientation: new Cesium.CallbackProperty(() => {
+            const hpr = Cesium.HeadingPitchRoll.fromDegrees(heading, 0, 0);
+            return Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
+          }, false),
+          model: {
+            uri: "../models/Car.glb",
+            scale: 0.025,
+            heightReference: Cesium.HeightReference.NONE,
+          },
+        });
+
+        viewer.trackedEntity = carEntity;
+
+        async function updateHeightAboveGround() {
+          const carto = Cesium.Cartographic.fromCartesian(position);
+          try {
+            const updated = await Cesium.sampleTerrainMostDetailed(
+              viewer.terrainProvider,
+              [carto]
+            );
+            const height = updated[0].height;
+            carto.height = height + 1.0;
+            position = Cesium.Cartographic.toCartesian(carto);
+          } catch (err) {
+            console.error("Height sampling error:", err);
           }
         }
 
-        // Speed control
-        if (keys["KeyW"]) {
+        let lastSampleTime = 0;
+        const sampleInterval = 10;
+
+        let steeringAngle = 0; // in degrees
+        const maxSteeringAngle = 30; // maximum left/right steering
+        const steeringRate = 120; // degrees per second
+        const steeringBackRate = 100;
+        const wheelBase = 5.0; // distance between front and rear axle (affects turning radius)
+        const acceleration = 20;
+        const accelerationback = 20;
+        const friction = 10;
+        const breakingFactor = 15;
+
+        const maxForwardSpeed = 80;
+        const maxReverseSpeed = -15;
+
+        viewer.clock.onTick.addEventListener(() => {
+          const dt = 0.016;
+
+          // Adjust steering angle
+          if (keys["KeyA"]) {
+            if (steeringAngle > -maxSteeringAngle)
+              steeringAngle = Math.min(
+                steeringAngle - steeringRate * dt,
+                maxSteeringAngle
+              );
+          } else if (keys["KeyD"]) {
+            if (steeringAngle < maxSteeringAngle)
+              steeringAngle = Math.max(
+                steeringAngle + steeringRate * dt,
+                -maxSteeringAngle
+              );
+          } else {
+            // Return steering to center gradually
+            if (steeringAngle > 0) {
+              steeringAngle = Math.max(
+                steeringAngle - steeringBackRate * dt,
+                0
+              );
+            } else if (steeringAngle < 0) {
+              steeringAngle = Math.min(
+                steeringAngle + steeringBackRate * dt,
+                0
+              );
+            }
+          }
+
+          // Speed control
+          if (keys["Space"]) {
+            breaking = breakingFactor * Math.sqrt(Math.abs(speed));
+            if (speed > 0) {
+              speed = Math.max(speed - breaking * dt, 0);
+            } else if (speed < 0) {
+              speed = Math.min(speed + breaking * dt, 0);
+            }
+          }
+          else if (keys["KeyW"]) {
             if (speed < maxForwardSpeed) {
-              speed += (maxForwardSpeed - speed) * acceleration * dt;
-        
-            }}
+              speed +=
+                ((maxForwardSpeed - speed) / maxForwardSpeed) *
+                acceleration *
+                dt;
+            }
+          }
+          else if (keys["KeyS"]) {
+            if (speed > maxReverseSpeed) {
+              speed -=
+                ((maxReverseSpeed - speed) / maxReverseSpeed) *
+                accelerationback *
+                dt;
+            }
+          }
+          else {
+            if (speed > 0) {
+              speed = Math.max(speed - friction * dt, 0);
+            } else if (speed < 0) {
+                speed = Math.min(speed + friction * dt, 0);
+            }
+          }
 
+          // If we're moving, apply turning
+          if (speed !== 0 && steeringAngle !== 0) {
+            const turnRadius =
+              wheelBase /
+              Math.sin(Cesium.Math.toRadians(Math.abs(steeringAngle)));
+            const angularVelocity = speed / turnRadius; // radians per second
+            heading += Cesium.Math.toDegrees(
+              angularVelocity * dt * Math.sign(steeringAngle)
+            );
+          }
 
-         if (keys["KeyS"]) {
-                      if (speed > maxReverseSpeed) {
-          speed -= accelerationback * dt;
-        } 
+          // Artificial max speed
+          if (speed > maxForwardSpeed) {
+            speed = maxForwardSpeed;
+          } else if (speed < maxReverseSpeed) {
+            speed = maxReverseSpeed;
+          }
+
+          console.log(speed)
+
+          // Apply movement
+          const hpr = Cesium.HeadingPitchRoll.fromDegrees(heading, 0, 0);
+          const transform = Cesium.Transforms.headingPitchRollToFixedFrame(
+            position,
+            hpr
+          );
+
+          const forwardLocal = new Cesium.Cartesian3(1, 0, 0);
+          const forwardWorld = Cesium.Matrix4.multiplyByPointAsVector(
+            transform,
+            forwardLocal,
+            new Cesium.Cartesian3()
+          );
+
+          Cesium.Cartesian3.normalize(forwardWorld, forwardWorld);
+          Cesium.Cartesian3.multiplyByScalar(
+            forwardWorld,
+            speed * dt,
+            forwardWorld
+          );
+          Cesium.Cartesian3.add(position, forwardWorld, position);
+
+          const now = performance.now();
+          if (now - lastSampleTime > sampleInterval) {
+            lastSampleTime = now;
+            updateHeightAboveGround();
+          }
+        });
       }
 
-        if (keys["Space"]) {
-          braking = brakingFactor * Math.sqrt(Math.abs(speed));
-          if (speed > 0) {
-              speed = Math.max(speed - braking * dt, 0);
-          } else if (speed < 0) {
-              speed = Math.min(speed + braking * dt, 0);
-          }
-        }
-
-        if (speed > 0) {
-            speed = Math.max(speed - friction * dt, 0);
-        } else if (speed < 0) {
-            speed = Math.min(speed + friction * dt, 0);
-        }
-
-
-        // If we're moving, apply turning
-        if (speed !== 0 && steeringAngle !== 0) {
-          const turnRadius = wheelBase / Math.sin(Cesium.Math.toRadians(Math.abs(steeringAngle)));
-          const angularVelocity = speed / turnRadius; // radians per second
-          heading += Cesium.Math.toDegrees(angularVelocity * dt * Math.sign(steeringAngle));
-        }
-
-
-
-
-
-        // Apply movement
-        const hpr = Cesium.HeadingPitchRoll.fromDegrees(heading, 0, 0);
-        const transform = Cesium.Transforms.headingPitchRollToFixedFrame(position, hpr);
-
-        const forwardLocal = new Cesium.Cartesian3(1, 0, 0);
-        const forwardWorld = Cesium.Matrix4.multiplyByPointAsVector(transform, forwardLocal, new Cesium.Cartesian3());
-
-        Cesium.Cartesian3.normalize(forwardWorld, forwardWorld);
-        Cesium.Cartesian3.multiplyByScalar(forwardWorld, speed * dt, forwardWorld);
-        Cesium.Cartesian3.add(position, forwardWorld, position);
-
-        const now = performance.now();
-        if (now - lastSampleTime > sampleInterval) {
-          lastSampleTime = now;
-          updateHeightAboveGround();
-        }
-      });
-
-    }
-  
-    // Run the initialization
-    initViewer();
-  </script>
-</body>
+      // Run the initialization
+      initViewer();
+    </script>
+  </body>
 </html>
