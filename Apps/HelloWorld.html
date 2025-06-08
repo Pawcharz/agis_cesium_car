@@ -86,7 +86,7 @@
       const steeringBackRate = 100;
       const wheelBase = 5.0; // distance between front and rear axle (affects turning radius)
       const acceleration = 5;
-      const accelerationback = 200;
+      const accelerationback = 2;
       const friction = 100;
       const brakingFactor = 160;
 
@@ -121,8 +121,8 @@
 
 
          if (keys["KeyS"]) {
-                      if (speed > maxReverseSpeed) {
-          speed -= accelerationback * dt;
+            if (speed > maxReverseSpeed) {
+              speed += (maxReverseSpeed + speed) * accelerationback * dt;
         } 
       }
 
