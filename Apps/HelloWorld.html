@@ -95,8 +95,10 @@
 
         // Adjust steering angle
         if (keys["KeyA"]) {
+          if(steeringAngle > -maxSteeringAngle )
           steeringAngle = Math.min(steeringAngle - steeringRate * dt, maxSteeringAngle);
         } else if (keys["KeyD"]) {
+          if(steeringAngle < maxSteeringAngle )
           steeringAngle = Math.max(steeringAngle + steeringRate * dt, -maxSteeringAngle);
         } else {
           // Return steering to center gradually
