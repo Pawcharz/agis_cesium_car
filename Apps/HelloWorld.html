@@ -85,10 +85,13 @@
       const steeringRate = 120; // degrees per second
       const steeringBackRate = 100;
       const wheelBase = 5.0; // distance between front and rear axle (affects turning radius)
-      const acceleration = 50;
-      const accelerationback = 40;
-      const friction = 10;
-      const brakes = 160;
+      const acceleration = 5;
+      const accelerationback = 200;
+      const friction = 100;
+      const brakingFactor = 160;
+
+      const maxForwardSpeed = 150;
+      const maxReverseSpeed = -20;
 
       viewer.clock.onTick.addEventListener(() => {
         const dt = 0.016;
@@ -111,16 +114,33 @@
 
         // Speed control
         if (keys["KeyW"]) {
-          speed = speed + acceleration * dt;
-        } else if (keys["KeyS"]) {
-          speed = speed - accelerationback * dt;
+            if (speed < maxForwardSpeed) {
+              speed += (maxForwardSpeed - speed) * acceleration * dt;
+        
+            }}
+
+
+         if (keys["KeyS"]) {
+                      if (speed > maxReverseSpeed) {
+          speed -= accelerationback * dt;
         } 
+      }
+
+        if (keys["Space"]) {
+          braking = brakingFactor * Math.sqrt(Math.abs(speed));
+          if (speed > 0) {
+              speed = Math.max(speed - braking * dt, 0);
+          } else if (speed < 0) {
+              speed = Math.min(speed + braking * dt, 0);
+          }
+        }
 
         if (speed > 0) {
             speed = Math.max(speed - friction * dt, 0);
         } else if (speed < 0) {
             speed = Math.min(speed + friction * dt, 0);
         }
+
 
         // If we're moving, apply turning
         if (speed !== 0 && steeringAngle !== 0) {
@@ -130,13 +150,6 @@
         }
 
 
-        if (keys["Space"]) {
-          if (speed > 0) {
-              speed = Math.max(speed - brakes * dt, 0);
-          } else if (speed < 0) {
-              speed = Math.min(speed + brakes * dt, 0);
-          }
-        }
 
 
 
