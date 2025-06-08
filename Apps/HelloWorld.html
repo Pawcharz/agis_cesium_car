@@ -80,31 +80,69 @@
       let lastSampleTime = 0;
       const sampleInterval = 10;
   
+      let steeringAngle = 0; // in degrees
+      const maxSteeringAngle = 30; // maximum left/right steering
+      const steeringRate = 120; // degrees per second
+      const steeringBackRate = 100;
+      const wheelBase = 5.0; // distance between front and rear axle (affects turning radius)
+      const acceleration = 50;
+      const friction = 10;
+
       viewer.clock.onTick.addEventListener(() => {
         const dt = 0.016;
-  
-        if (keys["KeyA"]) heading -= 90 * dt;
-        if (keys["KeyD"]) heading += 90 * dt;
-        if (keys["KeyW"]) speed = 50;
-        else if (keys["KeyS"]) speed = -5;
-        else speed = 0;
-  
+
+        // Adjust steering angle
+        if (keys["KeyA"]) {
+          steeringAngle = Math.min(steeringAngle - steeringRate * dt, maxSteeringAngle);
+        } else if (keys["KeyD"]) {
+          steeringAngle = Math.max(steeringAngle + steeringRate * dt, -maxSteeringAngle);
+        } else {
+          // Return steering to center gradually
+          if (steeringAngle > 0) {
+            steeringAngle = Math.max(steeringAngle - steeringBackRate * dt, 0);
+          } else if (steeringAngle < 0) {
+            steeringAngle = Math.min(steeringAngle + steeringBackRate * dt, 0);
+          }
+        }
+
+        // Speed control
+        if (keys["KeyW"]) {
+          speed = speed + acceleration * dt;
+        } else if (keys["KeyS"]) {
+          speed = -5;
+        } 
+
+        if (speed > 0) {
+            speed = Math.max(speed - friction * dt, 0);
+        } else if (speed < 0) {
+            speed = Math.min(speed + friction * dt, 0);
+        }
+
+        // If we're moving, apply turning
+        if (speed !== 0 && steeringAngle !== 0) {
+          const turnRadius = wheelBase / Math.sin(Cesium.Math.toRadians(Math.abs(steeringAngle)));
+          const angularVelocity = speed / turnRadius; // radians per second
+          heading += Cesium.Math.toDegrees(angularVelocity * dt * Math.sign(steeringAngle));
+        }
+
+        // Apply movement
         const hpr = Cesium.HeadingPitchRoll.fromDegrees(heading, 0, 0);
         const transform = Cesium.Transforms.headingPitchRollToFixedFrame(position, hpr);
-  
+
         const forwardLocal = new Cesium.Cartesian3(1, 0, 0);
         const forwardWorld = Cesium.Matrix4.multiplyByPointAsVector(transform, forwardLocal, new Cesium.Cartesian3());
-  
+
         Cesium.Cartesian3.normalize(forwardWorld, forwardWorld);
         Cesium.Cartesian3.multiplyByScalar(forwardWorld, speed * dt, forwardWorld);
         Cesium.Cartesian3.add(position, forwardWorld, position);
-  
+
         const now = performance.now();
         if (now - lastSampleTime > sampleInterval) {
           lastSampleTime = now;
           updateHeightAboveGround();
         }
       });
+
     }
   
     // Run the initialization
