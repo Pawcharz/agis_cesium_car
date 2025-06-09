@@ -38,11 +38,19 @@
           { requestVertexNormals: true }
         );
 
+
+
         const viewer = new Cesium.Viewer("cesiumContainer", {
           terrainProvider: terrainProvider,
           shadows: true,
           shouldAnimate: true,
         });
+
+
+        const buildingsTileset = await Cesium.createOsmBuildingsAsync();
+        viewer.scene.primitives.add(buildingsTileset);
+
+
 
         const initialPos = Cesium.Cartesian3.fromDegrees(
           18.613937,
@@ -160,7 +168,7 @@
                 acceleration *
                 dt;
             }
-
+            
 
             const carto = Cesium.Cartographic.fromCartesian(position);
             console.log(
@@ -178,6 +186,10 @@
                 dt;
             }
           }
+
+
+
+
           else {
             if (speed > 0) {
               speed = Math.max(speed - friction * dt, 0);
@@ -185,7 +197,7 @@
                 speed = Math.min(speed + friction * dt, 0);
             }
           }
-
+          
           // If we're moving, apply turning
           if (speed !== 0 && steeringAngle !== 0) {
             const turnRadius =
