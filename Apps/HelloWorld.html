@@ -81,16 +81,59 @@
         });
 
         viewer.trackedEntity = carEntity;
-
+        
+        let previousHeight = null;
+        let terrainAngle = 0; // angle in degrees
+        let slopeMultiplier = 1.0; // speed multiplier based on slope
+        
         async function updateHeightAboveGround() {
           const carto = Cesium.Cartographic.fromCartesian(position);
+          
+          // Calculate position in movement direction for slope calculation
+          const lookAheadDistance = 2; // meters in movement direction
+          const hpr = Cesium.HeadingPitchRoll.fromDegrees(heading, 0, 0);
+          const transform = Cesium.Transforms.headingPitchRollToFixedFrame(position, hpr);
+          const forwardLocal = new Cesium.Cartesian3(1, 0, 0);
+          const forwardWorld = Cesium.Matrix4.multiplyByPointAsVector(transform, forwardLocal, new Cesium.Cartesian3());
+          Cesium.Cartesian3.normalize(forwardWorld, forwardWorld);
+          
+          // Adjust direction based on movement direction (forward/backward)
+          const movementDirection = speed >= 0 ? 1 : -1;
+          Cesium.Cartesian3.multiplyByScalar(forwardWorld, lookAheadDistance * movementDirection, forwardWorld);
+          const aheadPosition = Cesium.Cartesian3.add(position, forwardWorld, new Cesium.Cartesian3());
+          const aheadCarto = Cesium.Cartographic.fromCartesian(aheadPosition);
+          
           try {
+            const positions = [carto, aheadCarto];
             const updated = await Cesium.sampleTerrainMostDetailed(
               viewer.terrainProvider,
-              [carto]
+              positions
             );
-            const height = updated[0].height;
-            carto.height = height + 1.0;
+
+            const currentHeight = updated[0].height;
+            const aheadHeight = updated[1].height;
+            
+            // Calculate terrain angle
+            const heightDifference = aheadHeight - currentHeight;
+            terrainAngle = Math.atan(heightDifference / lookAheadDistance) * (180 / Math.PI);
+            
+            // Calculate slope multiplier (uphill = slower, downhill = faster)
+            // Positive angle = uphill, negative angle = downhill
+            const maxAngleEffect = 30; // degrees - maximum angle for full effect
+            const minSpeedMultiplier = 0.1; // minimum speed when going steep uphill
+            const maxSpeedMultiplier = 1.5; // maximum speed when going steep downhill
+            
+            if (terrainAngle > 0) {
+              // Going uphill - reduce speed
+              const angleRatio = Math.min(terrainAngle / maxAngleEffect, 1.0);
+              slopeMultiplier = 1.0 - (1.0 - minSpeedMultiplier) * angleRatio;
+            } else {
+              // Going downhill - increase speed slightly
+              const angleRatio = Math.min(Math.abs(terrainAngle) / maxAngleEffect, 1.0);
+              slopeMultiplier = 1.0 + (maxSpeedMultiplier - 1.0) * angleRatio;
+            }
+            
+            carto.height = currentHeight + 1.0;
             position = Cesium.Cartographic.toCartesian(carto);
           } catch (err) {
             console.error("Height sampling error:", err);
@@ -102,8 +145,8 @@
 
         let steeringAngle = 0; // in degrees
         const maxSteeringAngle = 30; // maximum left/right steering
-        const steeringRate = 120; // degrees per second
-        const steeringBackRate = 100;
+        const steeringRate = 60; // degrees per second
+        const steeringBackRate = 50;
         const wheelBase = 5.0; // distance between front and rear axle (affects turning radius)
         const acceleration = 20;
         const accelerationback = 20;
@@ -195,9 +238,9 @@
             speed = maxReverseSpeed;
           }
 
-          console.log(speed)
+          console.log(`Speed: ${speed.toFixed(1)}, Terrain Angle: ${terrainAngle.toFixed(1)}°, Slope Multiplier: ${slopeMultiplier.toFixed(2)}`)
 
-          // Apply movement
+          // Apply movement with slope multiplier
           const hpr = Cesium.HeadingPitchRoll.fromDegrees(heading, 0, 0);
           const transform = Cesium.Transforms.headingPitchRollToFixedFrame(
             position,
@@ -214,7 +257,7 @@
           Cesium.Cartesian3.normalize(forwardWorld, forwardWorld);
           Cesium.Cartesian3.multiplyByScalar(
             forwardWorld,
-            speed * dt,
+            speed * slopeMultiplier * dt,
             forwardWorld
           );
           Cesium.Cartesian3.add(position, forwardWorld, position);
