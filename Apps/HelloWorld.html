@@ -45,8 +45,8 @@
         });
 
         const initialPos = Cesium.Cartesian3.fromDegrees(
-          -75.59777,
-          40.03883,
+          18.613937,
+          54.371198,
           100
         );
         viewer.camera.setView({
@@ -102,7 +102,7 @@
 
         let steeringAngle = 0; // in degrees
         const maxSteeringAngle = 30; // maximum left/right steering
-        const steeringRate = 120; // degrees per second
+        const steeringRate = 220; // degrees per second
         const steeringBackRate = 100;
         const wheelBase = 5.0; // distance between front and rear axle (affects turning radius)
         const acceleration = 20;
@@ -110,7 +110,7 @@
         const friction = 10;
         const breakingFactor = 15;
 
-        const maxForwardSpeed = 80;
+        const maxForwardSpeed = 8000;
         const maxReverseSpeed = -15;
 
         viewer.clock.onTick.addEventListener(() => {
@@ -160,6 +160,15 @@
                 acceleration *
                 dt;
             }
+
+
+            const carto = Cesium.Cartographic.fromCartesian(position);
+            console.log(
+              `Position - Lon: ${Cesium.Math.toDegrees(carto.longitude).toFixed(6)}, ` +
+              `Lat: ${Cesium.Math.toDegrees(carto.latitude).toFixed(6)}, ` +
+              `Height: ${carto.height?.toFixed(2) || "loading"} m, ` +
+              `Heading: ${heading.toFixed(2)}°`
+            );
           }
           else if (keys["KeyS"]) {
             if (speed > maxReverseSpeed) {
