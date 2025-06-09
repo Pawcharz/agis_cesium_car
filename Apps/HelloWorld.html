@@ -86,12 +86,12 @@
       const steeringBackRate = 100;
       const wheelBase = 5.0; // distance between front and rear axle (affects turning radius)
       const acceleration = 5;
-      const accelerationback = 2;
+      const accelerationback = 5;
       const friction = 100;
       const brakingFactor = 160;
 
       const maxForwardSpeed = 150;
-      const maxReverseSpeed = -20;
+      const maxReverseSpeed = 20;
 
       viewer.clock.onTick.addEventListener(() => {
         const dt = 0.016;
@@ -120,11 +120,15 @@
             }}
 
 
-         if (keys["KeyS"]) {
-            if (speed > maxReverseSpeed) {
-              speed += (maxReverseSpeed + speed) * accelerationback * dt;
-        } 
-      }
+        if (keys["KeyS"]) {
+          if (-speed < maxReverseSpeed) {
+            speed -= (maxReverseSpeed + speed) * accelerationback * dt;
+            console.log("Current Speed:", speed.toFixed(2));
+          }
+
+
+     //       speed = speed - accelerationback
+        }
 
         if (keys["Space"]) {
           braking = brakingFactor * Math.sqrt(Math.abs(speed));
